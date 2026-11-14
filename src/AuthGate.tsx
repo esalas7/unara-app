@@ -5,7 +5,6 @@ import { WorkspaceApp, initialSongs } from './App';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import { createWorkspace, getMyWorkspace, getProfile, joinWorkspace, PublicProfile, seedWorkspace } from './lib/workspace';
 
-const roles = ['Líder', 'Músico', 'Sonido', 'Multimedia'];
 const localDate = new Date();
 const latestBirthday = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
 type Mode = 'login' | 'signup';
@@ -18,10 +17,10 @@ export default function AuthGate() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
-  const [role, setRole] = useState('Músico');
   const [workspaceName, setWorkspaceName] = useState('Equipo de adoración');
   const [inviteCode, setInviteCode] = useState('');
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [membershipPending, setMembershipPending] = useState(false);
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
@@ -44,11 +43,11 @@ export default function AuthGate() {
       if (!session?.user) { setWorkspaceId(null); setProfile(null); setLoading(false); return; }
       setLoading(true); setError('');
       try {
-        const [userProfile, teamId] = await Promise.all([
+        const [userProfile, membership] = await Promise.all([
           getProfile(session.user.id),
           getMyWorkspace(session.user.id),
         ]);
-        if (alive) { setProfile(userProfile); setWorkspaceId(teamId); }
+        if (alive) { setProfile(userProfile); setWorkspaceId(membership?.workspace_id || null); setMembershipPending(membership?.membership_status==='pending'); }
       } catch (reason) {
         if (alive) setError(reason instanceof Error ? reason.message : 'No pudimos cargar tu cuenta.');
       } finally { if (alive) setLoading(false); }
@@ -65,7 +64,7 @@ export default function AuthGate() {
         const { data, error: authError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { full_name: name.trim(), date_of_birth: birthDate, role } },
+          options: { data: { full_name: name.trim(), date_of_birth: birthDate } },
         });
         if (authError) throw authError;
         if (!data.session) {
@@ -111,6 +110,7 @@ export default function AuthGate() {
       const savedMeetings = readSaved('unara.meetings', []);
       await seedWorkspace(team.id, savedSongs, savedMeetings);
       setWorkspaceId(team.id);
+      setMembershipPending(false);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'No pudimos crear el espacio.'); }
     finally { setBusy(false); }
   };
@@ -120,6 +120,7 @@ export default function AuthGate() {
     try {
       const team = await joinWorkspace(inviteCode);
       setWorkspaceId(team.id);
+      setMembershipPending(true);
     } catch (reason) { setError(readErrorMessage(reason, 'No pudimos completar la unión al equipo.')); }
     finally { setBusy(false); }
   };
@@ -128,6 +129,7 @@ export default function AuthGate() {
   if (loading) return <MessageScreen>Preparando tu espacio de UNARA…</MessageScreen>;
   if (recoveryMode) return <div className="auth-page"><section className="auth-card"><Brand/><span className="eyebrow">RECUPERAR CUENTA</span><h1>Elige una contraseña nueva</h1><form onSubmit={finishPasswordReset}><label className="field"><span>Nueva contraseña</span><input required type="password" minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Al menos 8 caracteres"/></label><button className="primary full" disabled={busy}>{busy?'Un momento…':'Guardar contraseña'}</button></form><Status error={error} message={message}/></section></div>;
   if (session && error && !profile) return <div className="auth-page"><section className="auth-card"><Brand/><h1>No pudimos abrir tu cuenta</h1><Status error={error}/><button className="secondary full" onClick={()=>window.location.reload()}>Intentar de nuevo</button><button className="auth-text-button" onClick={()=>supabase?.auth.signOut()}>Cerrar sesión</button></section></div>;
+  if (session && workspaceId && profile && membershipPending) return <div className="auth-page"><section className="auth-card"><Brand/><span className="eyebrow">SOLICITUD ENVIADA</span><h1>Esperando aprobación</h1><p>Un administrador del equipo debe aceptar tu solicitud. Cuando te acepten, pulsa el botón para entrar.</p><button className="primary full" onClick={async()=>{setBusy(true);try{const membership=await getMyWorkspace(session.user.id);setWorkspaceId(membership?.workspace_id||null);setMembershipPending(membership?.membership_status==='pending');}catch(reason){setError(reason instanceof Error?reason.message:'No pudimos revisar tu solicitud.')}finally{setBusy(false)}}} disabled={busy}>{busy?'Revisando…':'Ya me aceptaron, entrar'}</button><Status error={error}/><button className="auth-text-button" onClick={()=>supabase?.auth.signOut()}>Cerrar sesión</button></section></div>;
   if (session && workspaceId && profile) {
     return <WorkspaceApp
       workspaceId={workspaceId}
@@ -144,8 +146,7 @@ export default function AuthGate() {
     <form onSubmit={submitAuth}>
       {mode === 'signup' && <>
         <label className="field"><span>Nombre completo</span><input required autoComplete="name" value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre"/></label>
-          <div className="form-grid auth-profile-grid"><label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" max={latestBirthday} autoComplete="bday" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/></label>
-        <label className="field"><span>Cargo</span><select value={role} onChange={e=>setRole(e.target.value)}>{roles.map(item=><option key={item}>{item}</option>)}</select></label></div>
+          <div className="form-grid auth-profile-grid"><label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" max={latestBirthday} autoComplete="bday" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/></label></div>
       </>}
       <label className="field"><span>Correo electrónico</span><input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="nombre@correo.com"/></label>
       <label className="field"><span>Contraseña</span><input required type="password" minLength={8} autoComplete={mode === 'signup'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Al menos 8 caracteres"/></label>

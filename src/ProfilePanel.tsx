@@ -5,7 +5,6 @@ import type { PublicProfile } from './lib/workspace';
 import { getMyBirthday, getProfile, removeProfilePhoto, saveMyProfile, uploadProfilePhoto } from './lib/workspace';
 import { supabase } from './lib/supabase';
 
-const roles = ['Líder', 'Músico', 'Sonido', 'Multimedia'];
 const localDate = new Date();
 const latestBirthday = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
 
@@ -16,8 +15,6 @@ export default function ProfilePanel({ userId, email, profile, onProfileUpdate }
   onProfileUpdate: (profile: PublicProfile) => void;
 }) {
   const [name, setName] = useState(profile.full_name);
-  const [role, setRole] = useState(profile.role);
-  const [instruments, setInstruments] = useState(profile.instruments || '');
   const [birthday, setBirthday] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(profile.avatar_url || null);
@@ -52,7 +49,7 @@ export default function ProfilePanel({ userId, email, profile, onProfileUpdate }
       const oldPath = profile.avatar_path;
       if (photo) uploadedPath = await uploadProfilePhoto(userId, photo);
       const avatarPath = photo ? uploadedPath : removePhoto ? null : oldPath;
-      const updated = await saveMyProfile({ userId, fullName: name, role, instruments, birthday, avatarPath });
+      const updated = await saveMyProfile({ userId, fullName: name, birthday, avatarPath });
       onProfileUpdate(updated);
       setPhoto(null); setRemovePhoto(false); setPreview(updated.avatar_url || null);
       if (oldPath && oldPath !== avatarPath) await removeProfilePhoto(oldPath).catch(() => undefined);
@@ -83,11 +80,10 @@ export default function ProfilePanel({ userId, email, profile, onProfileUpdate }
       </div>
       <div className="form-grid profile-form-grid">
         <label className="field"><span>Nombre</span><input required minLength={2} maxLength={80} value={name} onChange={event=>setName(event.target.value)} placeholder="Tu nombre"/></label>
-        <label className="field"><span>Cargo</span><select value={role} onChange={event=>setRole(event.target.value)}>{roles.map(item=><option key={item}>{item}</option>)}</select></label>
         <label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" max={latestBirthday} value={birthday} onChange={event=>setBirthday(event.target.value)}/></label>
-        <label className="field"><span>Instrumentos o funciones</span><input maxLength={160} value={instruments} onChange={event=>setInstruments(event.target.value)} placeholder="Ej. Voz, guitarra, teclado"/></label>
       </div>
       <p className="profile-privacy"><ShieldCheck size={16}/> Tu fecha de nacimiento solo la puedes ver tú.</p>
+      <p className="profile-privacy">Tu cargo en el equipo y tus funciones se administran desde Integrantes.</p>
       <button className="primary" type="submit" disabled={busy}><Save size={16}/>{busy?'Guardando…':'Guardar cambios'}</button>
     </form>
     <section className="profile-card profile-account-card"><div><span className="eyebrow">ACCESO A LA CUENTA</span><h3>Correo electrónico</h3><p>Para cambiarlo, confirma la solicitud desde tus correos.</p></div><label className="field"><span>Correo nuevo</span><input type="email" required value={newEmail} onChange={event=>setNewEmail(event.target.value)} placeholder={email}/></label><button className="secondary" type="button" disabled={busy||newEmail.trim().toLowerCase()===email.trim().toLowerCase()} onClick={()=>void changeEmail()}><Mail size={16}/> Solicitar cambio de correo</button></section>
