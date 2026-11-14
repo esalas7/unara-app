@@ -19,6 +19,10 @@ La aplicación ya está preparada para usar Supabase. Antes de publicarla, hay q
 
 Esto crea los perfiles, espacios de equipo, canciones y reuniones compartidas. La fecha de nacimiento queda en una tabla separada con permisos para que solo la persona propietaria pueda leerla.
 
+## 2.1 Activar fotos y edición de perfil
+
+Para la pantalla de perfil y las fotos, repite el mismo procedimiento con `supabase/migrations/202611140002_editable_profiles_and_photos.sql`. Crea un espacio privado para las fotos y permite que solo la persona dueña suba o cambie su imagen; los miembros del mismo equipo pueden verla dentro de UNARA.
+
 ## 3. Configurar los correos de confirmación
 
 En Supabase, abre **Authentication → URL Configuration**:

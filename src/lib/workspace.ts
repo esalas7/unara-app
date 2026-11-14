@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type PublicProfile = { id: string; full_name: string; role: string; instruments: string };
+export type PublicProfile = { id: string; full_name: string; role: string; instruments: string; avatar_path: string | null; avatar_url?: string | null };
 export type WorkspaceDetails = { id: string; name: string; invite_code: string };
 export type RecordRow<T> = { id: string; data: T };
 
@@ -16,9 +16,50 @@ export async function getMyWorkspace(userId: string): Promise<string | null> {
 }
 
 export async function getProfile(userId: string) {
-  const { data, error } = await client().from('profiles').select('id,full_name,role,instruments').eq('id', userId).single();
+  const { data, error } = await client().from('profiles').select('id,full_name,role,instruments,avatar_path').eq('id', userId).single();
   if (error) throw error;
-  return data as PublicProfile;
+  return { ...data, avatar_url: await getAvatarUrl(data.avatar_path) } as PublicProfile;
+}
+
+export async function getMyBirthday(userId: string) {
+  const { data, error } = await client().from('profile_birthdays').select('date_of_birth').eq('user_id', userId).maybeSingle();
+  if (error) throw error;
+  return data?.date_of_birth || '';
+}
+
+export async function getAvatarUrl(path: string | null | undefined) {
+  if (!path) return null;
+  const { data, error } = await client().storage.from('profile-photos').createSignedUrl(path, 60 * 60 * 12);
+  if (error) return null;
+  return data.signedUrl;
+}
+
+export async function saveMyProfile(input: { userId: string; fullName: string; role: string; instruments: string; birthday: string; avatarPath: string | null }) {
+  const api = client();
+  const { error: profileError } = await api.from('profiles').update({
+    full_name: input.fullName.trim(), role: input.role, instruments: input.instruments.trim(), avatar_path: input.avatarPath,
+  }).eq('id', input.userId);
+  if (profileError) throw profileError;
+  const { error: birthdayError } = await api.from('profile_birthdays').upsert(
+    { user_id: input.userId, date_of_birth: input.birthday }, { onConflict: 'user_id' },
+  );
+  if (birthdayError) throw birthdayError;
+  return getProfile(input.userId);
+}
+
+export async function uploadProfilePhoto(userId: string, file: File) {
+  if (!file.type.startsWith('image/')) throw new Error('Elige una imagen JPG, PNG o WEBP.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('La foto debe pesar menos de 5 MB.');
+  const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const path = `${userId}/${crypto.randomUUID()}.${extension}`;
+  const { error } = await client().storage.from('profile-photos').upload(path, file, { cacheControl: '3600', upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+export async function removeProfilePhoto(path: string) {
+  const { error } = await client().storage.from('profile-photos').remove([path]);
+  if (error) throw error;
 }
 
 export async function createWorkspace(name: string) {
@@ -42,10 +83,14 @@ export async function getWorkspaceDetails(workspaceId: string) {
 export async function getWorkspaceMembers(workspaceId: string): Promise<PublicProfile[]> {
   const { data, error } = await client()
     .from('workspace_members')
-    .select('profile:profiles!workspace_members_user_id_fkey(id,full_name,role,instruments)')
+    .select('profile:profiles!workspace_members_user_id_fkey(id,full_name,role,instruments,avatar_path)')
     .eq('workspace_id', workspaceId);
   if (error) throw error;
-  return (data || []).map((row: any) => row.profile).filter(Boolean) as PublicProfile[];
+  const profiles = await Promise.all((data || []).map(async (row: any) => {
+    const profile = row.profile as PublicProfile | null;
+    return profile ? { ...profile, avatar_url: await getAvatarUrl(profile.avatar_path) } : null;
+  }));
+  return profiles.filter(profile => profile !== null);
 }
 
 export async function getWorkspaceRows<T>(table: 'workspace_songs' | 'workspace_meetings', workspaceId: string): Promise<RecordRow<T>[]> {

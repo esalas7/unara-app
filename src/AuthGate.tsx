@@ -130,7 +130,9 @@ export default function AuthGate() {
     return <WorkspaceApp
       workspaceId={workspaceId}
       userId={session.user.id}
+      email={session.user.email || ''}
       profile={profile}
+      onProfileUpdate={setProfile}
       onSignOut={() => supabase?.auth.signOut()}
     />;
   }
