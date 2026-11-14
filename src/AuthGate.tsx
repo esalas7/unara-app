@@ -120,7 +120,7 @@ export default function AuthGate() {
     try {
       const team = await joinWorkspace(inviteCode);
       setWorkspaceId(team.id);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No pudimos encontrar ese equipo.'); }
+    } catch (reason) { setError(readErrorMessage(reason, 'No pudimos completar la unión al equipo.')); }
     finally { setBusy(false); }
   };
 
@@ -159,6 +159,12 @@ export default function AuthGate() {
 }
 
 function Brand(){return <div className="auth-brand"><span className="brand-mark">U</span><div><b>UNARA</b><small>Un equipo. Un propósito.</small></div></div>}
+function readErrorMessage(reason: unknown, fallback: string) {
+  if (reason instanceof Error && reason.message) return reason.message;
+  if (reason && typeof reason === 'object' && 'message' in reason && typeof reason.message === 'string') return reason.message;
+  if (typeof reason === 'string' && reason.trim()) return reason;
+  return fallback;
+}
 function Status({error,message}:{error?:string;message?:string}){return <>{error&&<div role="alert" className="auth-status error-status">{error}</div>}{message&&<div role="status" className="auth-status">{message}</div>}</>}
 function MessageScreen({children}:{children:string}){return <div className="auth-page"><section className="auth-card"><Brand/><p>{children}</p></section></div>}
 function SetupNeeded(){return <MessageScreen>Falta conectar el almacenamiento seguro de UNARA. La pantalla de registro aparecerá cuando la configuración esté lista.</MessageScreen>}

@@ -69,7 +69,8 @@ export async function createWorkspace(name: string) {
 }
 
 export async function joinWorkspace(code: string) {
-  const { data, error } = await client().rpc('join_workspace', { code });
+  const normalizedCode = code.trim().replace(/[\s-]/g, '').toUpperCase();
+  const { data, error } = await client().rpc('join_workspace', { code: normalizedCode });
   if (error) throw error;
   return (Array.isArray(data) ? data[0] : data) as { id: string; name: string };
 }
