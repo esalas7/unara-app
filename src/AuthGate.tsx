@@ -6,6 +6,8 @@ import { hasSupabaseConfig, supabase } from './lib/supabase';
 import { createWorkspace, getMyWorkspace, getProfile, joinWorkspace, PublicProfile, seedWorkspace } from './lib/workspace';
 
 const roles = ['Líder', 'Músico', 'Sonido', 'Multimedia'];
+const localDate = new Date();
+const latestBirthday = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
 type Mode = 'login' | 'signup';
 
 export default function AuthGate() {
@@ -142,7 +144,7 @@ export default function AuthGate() {
     <form onSubmit={submitAuth}>
       {mode === 'signup' && <>
         <label className="field"><span>Nombre completo</span><input required autoComplete="name" value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre"/></label>
-        <div className="form-grid auth-profile-grid"><label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" autoComplete="bday" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/></label>
+          <div className="form-grid auth-profile-grid"><label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" max={latestBirthday} autoComplete="bday" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/></label>
         <label className="field"><span>Cargo</span><select value={role} onChange={e=>setRole(e.target.value)}>{roles.map(item=><option key={item}>{item}</option>)}</select></label></div>
       </>}
       <label className="field"><span>Correo electrónico</span><input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="nombre@correo.com"/></label>

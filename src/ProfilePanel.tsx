@@ -6,6 +6,8 @@ import { getMyBirthday, getProfile, removeProfilePhoto, saveMyProfile, uploadPro
 import { supabase } from './lib/supabase';
 
 const roles = ['Líder', 'Músico', 'Sonido', 'Multimedia'];
+const localDate = new Date();
+const latestBirthday = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
 
 export default function ProfilePanel({ userId, email, profile, onProfileUpdate }: {
   userId: string;
@@ -82,7 +84,7 @@ export default function ProfilePanel({ userId, email, profile, onProfileUpdate }
       <div className="form-grid profile-form-grid">
         <label className="field"><span>Nombre</span><input required minLength={2} maxLength={80} value={name} onChange={event=>setName(event.target.value)} placeholder="Tu nombre"/></label>
         <label className="field"><span>Cargo</span><select value={role} onChange={event=>setRole(event.target.value)}>{roles.map(item=><option key={item}>{item}</option>)}</select></label>
-        <label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" value={birthday} onChange={event=>setBirthday(event.target.value)}/></label>
+        <label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" max={latestBirthday} value={birthday} onChange={event=>setBirthday(event.target.value)}/></label>
         <label className="field"><span>Instrumentos o funciones</span><input maxLength={160} value={instruments} onChange={event=>setInstruments(event.target.value)} placeholder="Ej. Voz, guitarra, teclado"/></label>
       </div>
       <p className="profile-privacy"><ShieldCheck size={16}/> Tu fecha de nacimiento solo la puedes ver tú.</p>

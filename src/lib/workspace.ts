@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
-export type PublicProfile = { id: string; full_name: string; role: string; instruments: string; avatar_path: string | null; avatar_url?: string | null };
-export type WorkspaceDetails = { id: string; name: string; invite_code: string };
+export type PublicProfile = { id: string; full_name: string; role: string; instruments: string; avatar_path: string | null; avatar_url?: string | null; is_admin?: boolean };
+export type WorkspaceDetails = { id: string; name: string; invite_code: string; created_by?: string };
 export type RecordRow<T> = { id: string; data: T };
 
 function client() {
@@ -75,7 +75,7 @@ export async function joinWorkspace(code: string) {
 }
 
 export async function getWorkspaceDetails(workspaceId: string) {
-  const { data, error } = await client().from('workspaces').select('id,name,invite_code').eq('id', workspaceId).single();
+  const { data, error } = await client().from('workspaces').select('id,name,invite_code,created_by').eq('id', workspaceId).single();
   if (error) throw error;
   return data as WorkspaceDetails;
 }
@@ -83,14 +83,21 @@ export async function getWorkspaceDetails(workspaceId: string) {
 export async function getWorkspaceMembers(workspaceId: string): Promise<PublicProfile[]> {
   const { data, error } = await client()
     .from('workspace_members')
-    .select('profile:profiles!workspace_members_user_id_fkey(id,full_name,role,instruments,avatar_path)')
+    .select('is_admin,profile:profiles!workspace_members_user_id_fkey(id,full_name,role,instruments,avatar_path)')
     .eq('workspace_id', workspaceId);
   if (error) throw error;
   const profiles = await Promise.all((data || []).map(async (row: any) => {
     const profile = row.profile as PublicProfile | null;
-    return profile ? { ...profile, avatar_url: await getAvatarUrl(profile.avatar_path) } : null;
+    return profile ? { ...profile, is_admin: row.is_admin, avatar_url: await getAvatarUrl(profile.avatar_path) } : null;
   }));
   return profiles.filter(profile => profile !== null);
+}
+
+export async function setWorkspaceAdmin(workspaceId: string, userId: string, makeAdmin: boolean) {
+  const { error } = await client().rpc('set_workspace_admin', {
+    target_workspace: workspaceId, target_user: userId, make_admin: makeAdmin,
+  });
+  if (error) throw error;
 }
 
 export async function getWorkspaceRows<T>(table: 'workspace_songs' | 'workspace_meetings', workspaceId: string): Promise<RecordRow<T>[]> {
