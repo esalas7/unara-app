@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { ArrowRight, Music2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Music2, ShieldCheck } from 'lucide-react';
 import { WorkspaceApp, initialSongs } from './App';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import { createWorkspace, getMyWorkspace, getProfile, joinWorkspace, PublicProfile, seedWorkspace } from './lib/workspace';
@@ -15,6 +15,7 @@ export default function AuthGate() {
   const [mode, setMode] = useState<Mode>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [workspaceName, setWorkspaceName] = useState('Equipo de adoración');
@@ -127,7 +128,7 @@ export default function AuthGate() {
 
   if (!hasSupabaseConfig) return <SetupNeeded />;
   if (loading) return <MessageScreen>Preparando tu espacio de UNARA…</MessageScreen>;
-  if (recoveryMode) return <div className="auth-page"><section className="auth-card"><Brand/><span className="eyebrow">RECUPERAR CUENTA</span><h1>Elige una contraseña nueva</h1><form onSubmit={finishPasswordReset}><label className="field"><span>Nueva contraseña</span><input required type="password" minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Al menos 8 caracteres"/></label><button className="primary full" disabled={busy}>{busy?'Un momento…':'Guardar contraseña'}</button></form><Status error={error} message={message}/></section></div>;
+  if (recoveryMode) return <div className="auth-page"><section className="auth-card"><Brand/><span className="eyebrow">RECUPERAR CUENTA</span><h1>Elige una contraseña nueva</h1><form onSubmit={finishPasswordReset}><label className="field"><span>Nueva contraseña</span><span className="password-input-control"><input required type={passwordVisible?'text':'password'} minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Al menos 8 caracteres"/><button type="button" className="password-visibility" aria-label={passwordVisible?'Ocultar contraseña':'Mostrar contraseña'} aria-pressed={passwordVisible} onClick={()=>setPasswordVisible(value=>!value)}>{passwordVisible?<EyeOff size={18}/>:<Eye size={18}/>}</button></span></label><button className="primary full" disabled={busy}>{busy?'Un momento…':'Guardar contraseña'}</button></form><Status error={error} message={message}/></section></div>;
   if (session && error && !profile) return <div className="auth-page"><section className="auth-card"><Brand/><h1>No pudimos abrir tu cuenta</h1><Status error={error}/><button className="secondary full" onClick={()=>window.location.reload()}>Intentar de nuevo</button><button className="auth-text-button" onClick={()=>supabase?.auth.signOut()}>Cerrar sesión</button></section></div>;
   if (session && workspaceId && profile && membershipPending) return <div className="auth-page"><section className="auth-card"><Brand/><span className="eyebrow">SOLICITUD ENVIADA</span><h1>Esperando aprobación</h1><p>Un administrador del equipo debe aceptar tu solicitud. Cuando te acepten, pulsa el botón para entrar.</p><button className="primary full" onClick={async()=>{setBusy(true);try{const membership=await getMyWorkspace(session.user.id);setWorkspaceId(membership?.workspace_id||null);setMembershipPending(membership?.membership_status==='pending');}catch(reason){setError(reason instanceof Error?reason.message:'No pudimos revisar tu solicitud.')}finally{setBusy(false)}}} disabled={busy}>{busy?'Revisando…':'Ya me aceptaron, entrar'}</button><Status error={error}/><button className="auth-text-button" onClick={()=>supabase?.auth.signOut()}>Cerrar sesión</button></section></div>;
   if (session && workspaceId && profile) {
@@ -149,7 +150,7 @@ export default function AuthGate() {
           <div className="form-grid auth-profile-grid"><label className="field"><span>Fecha de nacimiento <small>(privada)</small></span><input required type="date" max={latestBirthday} autoComplete="bday" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/></label></div>
       </>}
       <label className="field"><span>Correo electrónico</span><input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="nombre@correo.com"/></label>
-      <label className="field"><span>Contraseña</span><input required type="password" minLength={8} autoComplete={mode === 'signup'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Al menos 8 caracteres"/></label>
+      <label className="field"><span>Contraseña</span><span className="password-input-control"><input required type={passwordVisible?'text':'password'} minLength={8} autoComplete={mode === 'signup'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Al menos 8 caracteres"/><button type="button" className="password-visibility" aria-label={passwordVisible?'Ocultar contraseña':'Mostrar contraseña'} aria-pressed={passwordVisible} onClick={()=>setPasswordVisible(value=>!value)}>{passwordVisible?<EyeOff size={18}/>:<Eye size={18}/>}</button></span></label>
       <button className="primary full" disabled={busy}>{busy?'Un momento…':mode==='signup'?'Crear cuenta':'Entrar'}</button>
     </form>
     {mode==='login'&&<button className="auth-text-button" onClick={()=>void resetPassword()}>Olvidé mi contraseña</button>}
