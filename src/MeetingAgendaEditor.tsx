@@ -41,7 +41,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   songs: Song[];
   canEdit: boolean;
   onMeetingChange: (meeting: T) => void;
-  onSongOpen?: (songId: string) => void;
+  onSongOpen?: (song: { songId: string; itemId: string; sectionId: string }) => void;
   onOpenLibrary?: () => void;
   showSectionNavigation?: boolean;
   liveSongs?: MeetingLiveSong[];
@@ -186,7 +186,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
               return <div className="agenda-item" key={item.id}>
                 {item.type==='song'
                   ? song
-                    ? onSongOpen?<button type="button" className="agenda-song" onClick={()=>onSongOpen(song.id)}>
+                    ? onSongOpen?<button type="button" className="agenda-song" onClick={()=>onSongOpen({songId:song.id,itemId:item.id,sectionId:section.id})}>
                         <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}{'isLive' in item&&item.isLive&&<em className="live-song-badge">Adicional</em>}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span><ChevronRight size={17}/>
                       </button>:<div className="agenda-song">
                         <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}{'isLive' in item&&item.isLive&&<em className="live-song-badge">Adicional</em>}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span>
