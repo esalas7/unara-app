@@ -1,3 +1,5 @@
+import type { MeetingLiveSong } from './meetingLive';
+
 export const meetingSectionOptions = [
   { type: 'alabanza', label: 'Alabanza' },
   { type: 'adoracion', label: 'Adoración' },
@@ -52,6 +54,46 @@ export function getAgendaSongIds(sections: MeetingSection[]) {
 export function getMeetingSongItems(meeting: MeetingWithAgenda) {
   return getMeetingSections(meeting).flatMap(section => section.items.flatMap(item => item.type === 'song'
     ? [{ id: item.id, songId: item.songId, sectionId: section.id, sectionType: section.type }]
+    : []));
+}
+
+export function mergeMeetingLiveSongs(items: MeetingAgendaItem[], extras: MeetingLiveSong[]): (MeetingAgendaItem & { isLive?: boolean })[] {
+  const children = new Map<string, MeetingLiveSong[]>();
+  for (const extra of extras) {
+    const anchor = extra.after_item_id || '';
+    children.set(anchor, [...(children.get(anchor) || []), extra]);
+  }
+  for (const group of children.values()) group.sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));
+  const output: (MeetingAgendaItem & { isLive?: boolean })[] = [];
+  const visited = new Set<string>();
+  const appendChildren = (anchor: string) => {
+    for (const extra of children.get(anchor) || []) {
+      if (visited.has(extra.id)) continue;
+      visited.add(extra.id);
+      output.push({ id: extra.id, type: 'song', songId: extra.song_id, isLive: true });
+      appendChildren(extra.id);
+    }
+  };
+  appendChildren('');
+  for (const item of items) {
+    output.push(item);
+    appendChildren(item.id);
+  }
+  for (const extra of extras) {
+    if (visited.has(extra.id)) continue;
+    visited.add(extra.id);
+    output.push({ id: extra.id, type: 'song', songId: extra.song_id, isLive: true });
+    appendChildren(extra.id);
+  }
+  return output;
+}
+
+export function getMeetingSongItemsWithLive(meeting: MeetingWithAgenda, extras: MeetingLiveSong[]) {
+  return getMeetingSections(meeting).flatMap(section => mergeMeetingLiveSongs(
+    section.items,
+    extras.filter(song => song.section_id === section.id),
+  ).flatMap(item => item.type === 'song'
+    ? [{ id: item.id, songId: item.songId, sectionId: section.id, sectionType: section.type, isLive: !!item.isLive }]
     : []));
 }
 

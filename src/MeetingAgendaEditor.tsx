@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, ChevronRight, Music2, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronRight, Music2, Plus, Save, Trash2, Play, Pause, RotateCcw, Clock3 } from 'lucide-react';
 import {
   getMeetingDuration,
   getMeetingSections,
+  mergeMeetingLiveSongs,
   MeetingAgendaItem,
   MeetingSection,
   MeetingWithAgenda,
@@ -14,6 +15,7 @@ import {
   saveMeetingSections,
   sectionLabel,
 } from './lib/meetingAgenda';
+import { MeetingLiveSong, MeetingSectionTimer, liveElapsedSeconds } from './lib/meetingLive';
 
 type Song = { id: string; title: string; artist: string; key: string };
 
@@ -25,6 +27,15 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   onSongOpen,
   onOpenLibrary,
   showSectionNavigation = false,
+  liveSongs = [],
+  sectionTimers = {},
+  currentSectionId = null,
+  liveNow = Date.now(),
+  canControlLive = false,
+  canAddLiveSongs = false,
+  onStartSection,
+  onSectionTimerAction,
+  onAddLiveSong,
 }: {
   meeting: T;
   songs: Song[];
@@ -33,10 +44,22 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   onSongOpen?: (songId: string) => void;
   onOpenLibrary?: () => void;
   showSectionNavigation?: boolean;
+  liveSongs?: MeetingLiveSong[];
+  sectionTimers?: Record<string, MeetingSectionTimer>;
+  currentSectionId?: string | null;
+  liveNow?: number;
+  canControlLive?: boolean;
+  canAddLiveSongs?: boolean;
+  onStartSection?: (sectionId: string) => void;
+  onSectionTimerAction?: (sectionId: string, action: 'section_pause' | 'section_reset') => void;
+  onAddLiveSong?: (sectionId: string, songId: string, afterItemId: string | null) => Promise<boolean | void>;
 }) {
   const [newSectionType, setNewSectionType] = useState('');
   const [songDrafts, setSongDrafts] = useState<Record<string, string>>({});
   const [activityDrafts, setActivityDrafts] = useState<Record<string, string>>({});
+  const [liveSongDrafts, setLiveSongDrafts] = useState<Record<string, string>>({});
+  const [liveSongPositions, setLiveSongPositions] = useState<Record<string, string>>({});
+  const [addingLiveSong, setAddingLiveSong] = useState<string | null>(null);
   const sections = getMeetingSections(meeting);
 
   const updateSections = (update: (current: MeetingSection[]) => MeetingSection[]) => {
@@ -124,6 +147,11 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
       : <div className="agenda-sections">{sections.map((section, sectionIndex)=>{
         const label = sectionLabel(section.type);
         const canEditSection = canEdit && section.type !== 'legacy';
+        const sectionLiveSongs = liveSongs.filter(song => song.section_id === section.id);
+        const mergedItems = mergeMeetingLiveSongs(section.items, sectionLiveSongs);
+        const timer = sectionTimers[section.id];
+        const timerElapsed = liveElapsedSeconds(timer?.elapsed_seconds || 0, timer?.started_at || null, !!timer?.is_running, liveNow);
+        const overEstimate = section.estimatedMinutes > 0 && timerElapsed > section.estimatedMinutes * 60;
         return <article className="form-card agenda-section" id={showSectionNavigation?`meeting-section-${section.id}`:undefined} key={section.id}>
           <div className="agenda-section-header">
             <div><span className="eyebrow">SECCIÓN {sectionIndex+1}</span><h3>{label}</h3></div>
@@ -138,27 +166,38 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
             </div>
           </div>
 
+          <div className={`live-section-clock${currentSectionId===section.id?' current':''}${overEstimate?' over-time':''}`}>
+            <div className="live-section-clock-info"><Clock3 size={16}/><span>{currentSectionId===section.id?'Sección actual':'Tiempo de sección'}</span><b>{formatLiveTime(timerElapsed)}</b><small>Estimado: {section.estimatedMinutes || 0} min{overEstimate?' · Tiempo superado':''}</small></div>
+            {canControlLive&&<div className="live-section-clock-actions">
+              {currentSectionId!==section.id&&<button type="button" className="secondary small" onClick={()=>onStartSection?.(section.id)}><Play size={14}/> Iniciar sección</button>}
+              {currentSectionId===section.id&&timer?.is_running&&<button type="button" className="secondary small" onClick={()=>onSectionTimerAction?.(section.id,'section_pause')}><Pause size={14}/> Pausar</button>}
+              {currentSectionId===section.id&&!timer?.is_running&&<button type="button" className="primary small" onClick={()=>onStartSection?.(section.id)}><Play size={14}/> Reanudar</button>}
+              {timerElapsed>0&&<button type="button" className="icon-button" aria-label="Reiniciar cronómetro de sección" onClick={()=>onSectionTimerAction?.(section.id,'section_reset')}><RotateCcw size={14}/></button>}
+            </div>}
+          </div>
+
           {section.type==='legacy'&&<p className="agenda-legacy-note">Estas canciones provienen de la agenda anterior. Muévelas a una sección para organizarlas.</p>}
 
-          {section.items.length===0
+          {mergedItems.length===0
             ? <p className="agenda-empty-items">Todavía no hay canciones ni actividades en esta sección.</p>
-            : <div className="agenda-items">{section.items.map((item,itemIndex)=>{
+            : <div className="agenda-items">{mergedItems.map(item=>{
               const song=item.type==='song'?songs.find(candidate=>candidate.id===item.songId):undefined;
+              const agendaIndex=section.items.findIndex(candidate=>candidate.id===item.id);
               return <div className="agenda-item" key={item.id}>
                 {item.type==='song'
                   ? song
                     ? onSongOpen?<button type="button" className="agenda-song" onClick={()=>onSongOpen(song.id)}>
-                        <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span><ChevronRight size={17}/>
+                        <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}{'isLive' in item&&item.isLive&&<em className="live-song-badge">Adicional</em>}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span><ChevronRight size={17}/>
                       </button>:<div className="agenda-song">
-                        <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span>
+                        <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}{'isLive' in item&&item.isLive&&<em className="live-song-badge">Adicional</em>}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span>
                       </div>
                     : <div className="agenda-song missing-song"><span className="song-icon"><Music2 size={17}/></span><span><b>Canción no disponible</b><small>Referencia: {item.songId}</small></span></div>
                   : <label className="field agenda-activity"><span>Actividad o indicación</span><textarea rows={2} maxLength={1000} value={item.text} readOnly={!canEdit} onChange={event=>updateSections(current=>current.map(currentSection=>currentSection.id===section.id?{...currentSection,items:currentSection.items.map(currentItem=>currentItem.id===item.id&&currentItem.type==='activity'?{...currentItem,text:event.target.value}:currentItem)}:currentSection))}/></label>}
 
-                {canEdit&&<div className="agenda-item-actions">
+                {canEdit&&(!('isLive' in item&&item.isLive))&&<div className="agenda-item-actions">
                   {sections.some(candidate=>candidate.id!==section.id&&candidate.type!=='legacy')&&<label className="field agenda-move"><span>Mover a</span><select value={section.id} onChange={event=>updateSections(current=>moveMeetingItem(current,section.id,item.id,event.target.value))}><option value={section.id} disabled>{label}</option>{sections.filter(candidate=>candidate.id!==section.id&&candidate.type!=='legacy').map(candidate=><option key={candidate.id} value={candidate.id}>{sectionLabel(candidate.type)}</option>)}</select></label>}
-                  <button type="button" className="icon-button" aria-label="Subir elemento" disabled={itemIndex===0} onClick={()=>updateSections(current=>reorderMeetingItem(current,section.id,item.id,-1))}><ArrowUp size={15}/></button>
-                  <button type="button" className="icon-button" aria-label="Bajar elemento" disabled={itemIndex===section.items.length-1} onClick={()=>updateSections(current=>reorderMeetingItem(current,section.id,item.id,1))}><ArrowDown size={15}/></button>
+                  <button type="button" className="icon-button" aria-label="Subir elemento" disabled={agendaIndex===0} onClick={()=>updateSections(current=>reorderMeetingItem(current,section.id,item.id,-1))}><ArrowUp size={15}/></button>
+                  <button type="button" className="icon-button" aria-label="Bajar elemento" disabled={agendaIndex===section.items.length-1} onClick={()=>updateSections(current=>reorderMeetingItem(current,section.id,item.id,1))}><ArrowDown size={15}/></button>
                   <button type="button" className="icon-button" aria-label="Quitar elemento" onClick={()=>updateSections(current=>removeMeetingItem(current,section.id,item.id))}><Trash2 size={15}/></button>
                 </div>}
               </div>;
@@ -176,7 +215,26 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
               <button type="button" className="secondary" disabled={!(activityDrafts[section.id]||'').trim()} onClick={()=>addActivity(section.id)}><Save size={15}/> Añadir actividad</button>
             </div>
           </div>}
+
+          {canAddLiveSongs&&<div className="agenda-add-items live-add-song">
+            <div className="agenda-add-song">
+              <label className="field"><span>Añadir canción durante la reunión</span><select value={liveSongDrafts[section.id]||''} onChange={event=>setLiveSongDrafts(current=>({...current,[section.id]:event.target.value}))}>
+                <option value="">Selecciona una canción del repertorio</option>{songs.map(song=><option key={song.id} value={song.id}>{song.title}{song.artist?` · ${song.artist}`:''}</option>)}
+              </select></label>
+              <label className="field"><span>Colocarla después de</span><select value={liveSongPositions[section.id]??mergedItems[mergedItems.length-1]?.id??''} onChange={event=>setLiveSongPositions(current=>({...current,[section.id]:event.target.value}))}>
+                <option value="">Al inicio</option>{mergedItems.map((item,index)=>{const title=item.type==='song'?songs.find(song=>song.id===item.songId)?.title||'Canción':'Actividad';return <option key={item.id} value={item.id}>{index+1}. {title}</option>})}
+              </select></label>
+              <button type="button" className="secondary" disabled={!liveSongDrafts[section.id]||addingLiveSong===section.id} onClick={async()=>{if(!onAddLiveSong)return;setAddingLiveSong(section.id);try{const success=await onAddLiveSong(section.id,liveSongDrafts[section.id],liveSongPositions[section.id]??mergedItems[mergedItems.length-1]?.id??null);if(success!==false)setLiveSongDrafts(current=>({...current,[section.id]:''}));}finally{setAddingLiveSong(null);}}}><Plus size={15}/> {addingLiveSong===section.id?'Añadiendo…':'Añadir canción'}</button>
+            </div>
+          </div>}
         </article>;
       })}</div>}
   </section>;
+}
+
+function formatLiveTime(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return hours ? `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(remainder).padStart(2,'0')}` : `${String(minutes).padStart(2,'0')}:${String(remainder).padStart(2,'0')}`;
 }
