@@ -29,8 +29,8 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   songs: Song[];
   canEdit: boolean;
   onMeetingChange: (meeting: T) => void;
-  onSongOpen: (songId: string) => void;
-  onOpenLibrary: () => void;
+  onSongOpen?: (songId: string) => void;
+  onOpenLibrary?: () => void;
 }) {
   const [newSectionType, setNewSectionType] = useState('');
   const [songDrafts, setSongDrafts] = useState<Record<string, string>>({});
@@ -95,9 +95,9 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
         <h2>Agenda por secciones</h2>
         <p className="agenda-total">Duración estimada: <b>{minutes} min</b></p>
       </div>
-      <button className="secondary" onClick={onOpenLibrary}>
+      {onOpenLibrary&&<button className="secondary" onClick={onOpenLibrary}>
         <Music2 size={16}/> Consultar repertorio
-      </button>
+      </button>}
     </div>
 
     {canEdit&&<div className="agenda-add-section">
@@ -138,9 +138,11 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
               return <div className="agenda-item" key={item.id}>
                 {item.type==='song'
                   ? song
-                    ? <button type="button" className="agenda-song" onClick={()=>onSongOpen(song.id)}>
+                    ? onSongOpen?<button type="button" className="agenda-song" onClick={()=>onSongOpen(song.id)}>
                         <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span><ChevronRight size={17}/>
-                      </button>
+                      </button>:<div className="agenda-song">
+                        <span className="song-icon"><Music2 size={17}/></span><span><b>{song.title}</b><small>{song.artist||'Artista no especificado'} · {song.key}</small></span>
+                      </div>
                     : <div className="agenda-song missing-song"><span className="song-icon"><Music2 size={17}/></span><span><b>Canción no disponible</b><small>Referencia: {item.songId}</small></span></div>
                   : <label className="field agenda-activity"><span>Actividad o indicación</span><textarea rows={2} maxLength={1000} value={item.text} readOnly={!canEdit} onChange={event=>updateSections(current=>current.map(currentSection=>currentSection.id===section.id?{...currentSection,items:currentSection.items.map(currentItem=>currentItem.id===item.id&&currentItem.type==='activity'?{...currentItem,text:event.target.value}:currentItem)}:currentSection))}/></label>}
 

@@ -150,6 +150,29 @@ export async function setMeetingAssignment(input: MeetingAssignment) {
   if (error) throw error;
 }
 
+export async function saveMeetingAssignments(workspaceId: string, meetingId: string, desired: MeetingAssignment[]) {
+  const api = client();
+  const { data, error } = await api.from('workspace_meeting_assignments').select('*').eq('workspace_id', workspaceId).eq('meeting_id', meetingId);
+  if (error) throw error;
+
+  const current = (data || []) as MeetingAssignment[];
+  const key = (row: MeetingAssignment) => `${row.user_id}\u0000${row.function_name}`;
+  const wanted = new Set(desired.map(key));
+  const existing = new Set(current.map(key));
+  const additions = desired.filter(row => !existing.has(key(row)));
+  if (additions.length) {
+    const { error: insertError } = await api.from('workspace_meeting_assignments').insert(additions);
+    if (insertError) throw insertError;
+  }
+
+  for (const row of current.filter(item => !wanted.has(key(item)))) {
+    const { error: deleteError } = await api.from('workspace_meeting_assignments').delete()
+      .eq('workspace_id', workspaceId).eq('meeting_id', meetingId)
+      .eq('user_id', row.user_id).eq('function_name', row.function_name);
+    if (deleteError) throw deleteError;
+  }
+}
+
 export async function getWorkspaceRows<T>(table: 'workspace_songs' | 'workspace_meetings', workspaceId: string): Promise<RecordRow<T>[]> {
   const { data, error } = await client().from(table).select('id,data').eq('workspace_id', workspaceId);
   if (error) throw error;
