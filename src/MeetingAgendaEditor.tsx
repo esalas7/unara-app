@@ -24,6 +24,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   onMeetingChange,
   onSongOpen,
   onOpenLibrary,
+  showSectionNavigation = false,
 }: {
   meeting: T;
   songs: Song[];
@@ -31,6 +32,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   onMeetingChange: (meeting: T) => void;
   onSongOpen?: (songId: string) => void;
   onOpenLibrary?: () => void;
+  showSectionNavigation?: boolean;
 }) {
   const [newSectionType, setNewSectionType] = useState('');
   const [songDrafts, setSongDrafts] = useState<Record<string, string>>({});
@@ -100,6 +102,13 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
       </button>}
     </div>
 
+    {showSectionNavigation&&sections.length>1&&<nav className="meeting-section-navigation" aria-label="Secciones de esta reunión">
+      <span>Ir a:</span>
+      {sections.map((section,index)=><button type="button" key={section.id} onClick={()=>document.getElementById(`meeting-section-${section.id}`)?.scrollIntoView({behavior:'smooth',block:'start'})}>
+        {index+1}. {sectionLabel(section.type)}
+      </button>)}
+    </nav>}
+
     {canEdit&&<div className="agenda-add-section">
       <label className="field"><span>Agregar una sección</span>
         <select value={newSectionType} onChange={event=>setNewSectionType(event.target.value)}>
@@ -115,7 +124,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
       : <div className="agenda-sections">{sections.map((section, sectionIndex)=>{
         const label = sectionLabel(section.type);
         const canEditSection = canEdit && section.type !== 'legacy';
-        return <article className="form-card agenda-section" key={section.id}>
+        return <article className="form-card agenda-section" id={showSectionNavigation?`meeting-section-${section.id}`:undefined} key={section.id}>
           <div className="agenda-section-header">
             <div><span className="eyebrow">SECCIÓN {sectionIndex+1}</span><h3>{label}</h3></div>
             <div className="agenda-section-actions">
