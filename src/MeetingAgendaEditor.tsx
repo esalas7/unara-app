@@ -34,8 +34,10 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   canControlLive = false,
   canAddLiveSongs = false,
   editorMode = false,
+  generalPanel,
   teamPanel,
   onSave,
+  finalActionLabel = 'Publicar cambios',
   saving = false,
   saveDisabled = false,
   onStartSection,
@@ -56,8 +58,10 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   canControlLive?: boolean;
   canAddLiveSongs?: boolean;
   editorMode?: boolean;
+  generalPanel?: ReactNode;
   teamPanel?: ReactNode;
   onSave?: () => void;
+  finalActionLabel?: string;
   saving?: boolean;
   saveDisabled?: boolean;
   onStartSection?: (sectionId: string) => void;
@@ -70,20 +74,49 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   const [liveSongDrafts, setLiveSongDrafts] = useState<Record<string, string>>({});
   const [liveSongPositions, setLiveSongPositions] = useState<Record<string, string>>({});
   const [addingLiveSong, setAddingLiveSong] = useState<string | null>(null);
-  const [activeEditorTab, setActiveEditorTab] = useState<string>('');
+  const [activeEditorTab, setActiveEditorTab] = useState<string>('general');
   const editorTabsRef = useRef<HTMLElement>(null);
+  const editorContentRef = useRef<HTMLDivElement>(null);
   const sections = getMeetingSections(meeting);
 
   useEffect(() => {
     if (!editorMode) return;
-    if (activeEditorTab && (activeEditorTab === 'team' ? !!teamPanel : sections.some(section => section.id === activeEditorTab))) return;
-    setActiveEditorTab(sections[0]?.id || (teamPanel ? 'team' : ''));
+    if (activeEditorTab === 'general' || (activeEditorTab === 'team' && !!teamPanel) || sections.some(section => section.id === activeEditorTab)) return;
+    setActiveEditorTab('general');
   }, [editorMode, activeEditorTab, sections, teamPanel]);
 
   useEffect(() => {
+    if (!editorMode) return;
+    const modal = editorTabsRef.current?.closest<HTMLElement>('.meeting-editor-redesigned');
+    if (!modal) return;
+    const viewport = window.visualViewport;
+    const syncViewport = () => {
+      const height = viewport?.height || window.innerHeight;
+      modal.style.setProperty('--meeting-editor-viewport-height', `${height}px`);
+      modal.style.setProperty('--meeting-editor-viewport-offset-top', `${viewport?.offsetTop || 0}px`);
+      modal.classList.toggle('keyboard-open', !!viewport && window.innerHeight - viewport.height > 120);
+    };
+    syncViewport();
+    viewport?.addEventListener('resize', syncViewport);
+    viewport?.addEventListener('scroll', syncViewport);
+    window.addEventListener('resize', syncViewport);
+    return () => {
+      viewport?.removeEventListener('resize', syncViewport);
+      viewport?.removeEventListener('scroll', syncViewport);
+      window.removeEventListener('resize', syncViewport);
+      modal.style.removeProperty('--meeting-editor-viewport-height');
+      modal.style.removeProperty('--meeting-editor-viewport-offset-top');
+      modal.classList.remove('keyboard-open');
+    };
+  }, [editorMode]);
+
+  useEffect(() => {
     if (!editorMode || !activeEditorTab) return;
-    editorTabsRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }, [editorMode, activeEditorTab]);
+    const tabs = editorTabsRef.current;
+    const activeTab = tabs?.querySelector<HTMLElement>('[data-active="true"]');
+    if (tabs && activeTab) tabs.scrollTo({ left: activeTab.offsetLeft - (tabs.clientWidth - activeTab.clientWidth) / 2, behavior: 'smooth' });
+    editorContentRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [editorMode, activeEditorTab, sections.map(section => section.id).join('|')]);
 
   const updateSections = (update: (current: MeetingSection[]) => MeetingSection[]) => {
     if (!canEdit) return;
@@ -99,7 +132,6 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
       items: [],
     };
     updateSections(current => [...current, section]);
-    if (editorMode) setActiveEditorTab(section.id);
     setNewSectionType('');
   };
 
@@ -115,7 +147,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
     updateSections(current => current.filter(item => item.id !== section.id));
     if (editorMode && activeEditorTab === section.id) {
       const index = sections.findIndex(item => item.id === section.id);
-      setActiveEditorTab(sections[index + 1]?.id || sections[index - 1]?.id || (teamPanel ? 'team' : ''));
+      setActiveEditorTab('general');
     }
   };
 
@@ -140,7 +172,20 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   };
 
   const minutes = getMeetingDuration(sections);
+  const isGeneralStep = editorMode && activeEditorTab === 'general';
+  const isTeamStep = editorMode && activeEditorTab === 'team';
   const visibleSections = editorMode ? sections.filter(section => section.id === activeEditorTab) : sections;
+  const editorSteps = editorMode ? ['general', ...sections.map(section => section.id), ...(teamPanel ? ['team'] : [])] : [];
+  const editorStepIndex = Math.max(0, editorSteps.indexOf(activeEditorTab));
+  const addSectionControl = <div className="agenda-add-section">
+    <label className="field"><span>Agregar una sección</span>
+      <select value={newSectionType} onChange={event=>setNewSectionType(event.target.value)}>
+        <option value="">Elige una sección</option>
+        {meetingSectionOptions.map(option=><option key={option.type} value={option.type}>{option.label}</option>)}
+      </select>
+    </label>
+    <button type="button" className="primary" disabled={!newSectionType} onClick={addSection}><Plus size={16}/> Agregar sección</button>
+  </div>;
   const moveWithinType = (section: MeetingSection, itemId: string, direction: -1 | 1) => {
     const item = section.items.find(entry => entry.id === itemId);
     if (!item) return;
@@ -157,7 +202,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   };
 
   return <section className="meeting-agenda">
-    <div className="section-head">
+    {!editorMode&&<div className="section-head">
       <div>
         <span className="eyebrow">ORDEN DEL SERVICIO</span>
         <h2>Agenda por secciones</h2>
@@ -166,35 +211,47 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
       {onOpenLibrary&&<button className="secondary" onClick={onOpenLibrary}>
         <Music2 size={16}/> Consultar repertorio
       </button>}
-    </div>
+    </div>}
 
     {editorMode&&<nav className="meeting-editor-tabs" ref={editorTabsRef} aria-label="Pestañas del editor de reunión">
+      <button type="button" data-active={isGeneralStep} aria-selected={isGeneralStep} className={isGeneralStep?'selected':''} onClick={()=>setActiveEditorTab('general')}>General</button>
       {sections.map((section,index)=><button type="button" key={section.id} data-active={activeEditorTab===section.id} aria-selected={activeEditorTab===section.id} className={activeEditorTab===section.id?'selected':''} onClick={()=>setActiveEditorTab(section.id)}>{index+1} {sectionLabel(section.type)}</button>)}
       {teamPanel&&<button type="button" data-active={activeEditorTab==='team'} aria-selected={activeEditorTab==='team'} className={activeEditorTab==='team'?'selected':''} onClick={()=>setActiveEditorTab('team')}>Equipo</button>}
     </nav>}
 
-    {showSectionNavigation&&sections.length>1&&<nav className="meeting-section-navigation" aria-label="Secciones de esta reunión">
+    {!editorMode&&showSectionNavigation&&sections.length>1&&<nav className="meeting-section-navigation" aria-label="Secciones de esta reunión">
       <span>Ir a:</span>
       {sections.map((section,index)=><button type="button" key={section.id} onClick={()=>document.getElementById(`meeting-section-${section.id}`)?.scrollIntoView({behavior:'smooth',block:'start'})}>
         {index+1}. {sectionLabel(section.type)}
       </button>)}
     </nav>}
 
-    {canEdit&&<div className="agenda-add-section">
-      <label className="field"><span>Agregar una sección</span>
-        <select value={newSectionType} onChange={event=>setNewSectionType(event.target.value)}>
-          <option value="">Elige una sección</option>
-          {meetingSectionOptions.map(option=><option key={option.type} value={option.type}>{option.label}</option>)}
-        </select>
-      </label>
-      <button type="button" className="primary" disabled={!newSectionType} onClick={addSection}><Plus size={16}/> Agregar sección</button>
+    {!editorMode&&canEdit&&addSectionControl}
+
+    {isGeneralStep&&<div className="meeting-editor-general-scroll" ref={editorContentRef}>
+      {generalPanel}
+      <section className="meeting-editor-sections-organizer">
+        <div className="meeting-editor-organizer-heading"><div><h3>Organización de secciones</h3><span>Orden del servicio · {minutes} min estimados</span></div></div>
+        {canEdit&&addSectionControl}
+        {sections.length===0?<p className="meeting-editor-no-sections">Todavía no agregas secciones. Puedes continuar y agregarlas después.</p>:<ol className="meeting-editor-section-list">{sections.map((section,index)=><li className="meeting-editor-section-row" key={section.id}>
+          <span className="meeting-editor-section-number">{index+1}</span>
+          <span className={`meeting-editor-section-color section-${section.type}`} aria-hidden="true"/>
+          <b>{sectionLabel(section.type)}</b>
+          <span className="meeting-editor-section-count">{section.items.length} elementos</span>
+          {canEdit&&<div className="meeting-editor-section-row-actions">
+            <button type="button" className="icon-button" aria-label={`Subir ${sectionLabel(section.type)}`} disabled={index===0} onClick={()=>updateSections(current=>reorderMeetingSection(current,section.id,-1))}><ArrowUp size={15}/></button>
+            <button type="button" className="icon-button" aria-label={`Bajar ${sectionLabel(section.type)}`} disabled={index===sections.length-1} onClick={()=>updateSections(current=>reorderMeetingSection(current,section.id,1))}><ArrowDown size={15}/></button>
+            <button type="button" className="icon-button" aria-label={`Eliminar ${sectionLabel(section.type)}`} onClick={()=>deleteSection(section)}><Trash2 size={15}/></button>
+          </div>}
+        </li>)}</ol>}
+      </section>
     </div>}
 
-    {editorMode&&activeEditorTab==='team'&&teamPanel&&<div className="meeting-editor-team-scroll">{teamPanel}</div>}
+    {isTeamStep&&teamPanel&&<div className="meeting-editor-team-scroll" ref={editorContentRef}>{teamPanel}</div>}
 
-    {!(editorMode&&activeEditorTab==='team')&&(!sections.length
+    {(!editorMode||(!isGeneralStep&&!isTeamStep))&&(!sections.length
       ? <div className="empty"><div><Music2/></div><h3>Agenda vacía</h3><p>{canEdit?'Agrega una sección para empezar a organizar esta reunión.':'Esta reunión todavía no tiene secciones ni canciones.'}</p></div>
-      : <div className={`agenda-sections${editorMode?' editor-agenda-sections':''}`}>{visibleSections.map((section)=>{
+      : <div ref={editorMode?editorContentRef:undefined} className={`agenda-sections${editorMode?' editor-agenda-sections':''}`}>{visibleSections.map((section)=>{
         const sectionIndex = sections.findIndex(candidate => candidate.id === section.id);
         const label = sectionLabel(section.type);
         const canEditSection = canEdit && section.type !== 'legacy';
@@ -234,7 +291,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
             <div className="agenda-section-actions">
               {canEditSection&&<label className="field agenda-minutes"><span>Minutos estimados</span><input type="number" min="0" step="1" value={section.estimatedMinutes} onChange={event=>{const parsed=Number(event.target.value);const value=Number.isFinite(parsed)?Math.max(0,Math.floor(parsed)):0;updateSections(current=>current.map(item=>item.id===section.id?{...item,estimatedMinutes:value}:item));}}/></label>}
               {!canEditSection&&<span className="pill">{section.estimatedMinutes} min</span>}
-              {canEditSection&&<>
+              {canEditSection&&!editorMode&&<>
                 <button type="button" className="icon-button" aria-label="Subir sección" disabled={sectionIndex===0} onClick={()=>updateSections(current=>reorderMeetingSection(current,section.id,-1))}><ArrowUp size={16}/></button>
                 <button type="button" className="icon-button" aria-label="Bajar sección" disabled={sectionIndex===sections.length-1} onClick={()=>updateSections(current=>reorderMeetingSection(current,section.id,1))}><ArrowDown size={16}/></button>
                 <button type="button" className="icon-button" aria-label="Eliminar sección" onClick={()=>deleteSection(section)}><Trash2 size={16}/></button>
@@ -288,7 +345,12 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
         </article>;
       })}</div>)}
 
-    {editorMode&&<footer className="meeting-editor-navigation"><button type="button" className="secondary" disabled={!sections.length||activeEditorTab===sections[0]?.id} onClick={()=>{const index=sections.findIndex(section=>section.id===activeEditorTab);setActiveEditorTab(index<0?sections[sections.length-1]?.id:sections[index-1]?.id||'team')}}><ArrowLeft size={16}/> Anterior</button><button type="button" className="secondary" disabled={!sections.length||activeEditorTab==='team'} onClick={()=>{const index=sections.findIndex(section=>section.id===activeEditorTab);setActiveEditorTab(index<0?'team':sections[index+1]?.id|| (teamPanel?'team':sections[index]?.id))}}>Siguiente <ArrowRight size={16}/></button><button type="button" className="primary" onClick={onSave} disabled={saving||saveDisabled||!onSave}><Save size={16}/> {saving?'Guardando…':'Guardar cambios'}</button></footer>}
+    {editorMode&&<footer className={`meeting-editor-navigation${editorStepIndex===editorSteps.length-1?' is-final-step':''}`}>
+      <button type="button" className="secondary" disabled={editorStepIndex===0} onClick={()=>setActiveEditorTab(editorSteps[Math.max(0,editorStepIndex-1)])}><ArrowLeft size={16}/> Anterior</button>
+      {editorStepIndex<editorSteps.length-1
+        ? <button type="button" className="primary" onClick={()=>setActiveEditorTab(editorSteps[editorStepIndex+1])}>Siguiente <ArrowRight size={16}/></button>
+        : <button type="button" className="primary" onClick={onSave} disabled={saving||saveDisabled||!onSave}><Save size={16}/> {saving?'Publicando…':finalActionLabel}</button>}
+    </footer>}
   </section>;
 }
 
