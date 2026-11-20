@@ -194,3 +194,15 @@ body:has(.meeting-editor-redesigned){overflow:hidden}
  .meeting-editor-redesigned.keyboard-open .meeting-editor-navigation button{min-height:38px}
  .meeting-editor-redesigned.keyboard-open .meeting-editor-save-state>small{display:none}
 }
+
+/* Keep meeting actions together and reachable on narrow screens. */
+.meeting-card-controls{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;min-width:0}
+.meeting-card-delete{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;flex:0 0 44px;padding:0;border:1px solid #c94c54;border-radius:9px;background:#c94c5414;color:#df6970;cursor:pointer}
+.meeting-card-delete:hover{background:#c94c5428}
+.meeting-card-delete:focus-visible{outline:2px solid #df6970;outline-offset:2px}
+@media(max-width:650px){
+ .meeting-card{align-items:stretch;gap:10px;min-width:0;max-width:100%}
+ .meeting-card-open{flex:1 1 100%;width:100%}
+ .meeting-card-controls{width:100%;max-width:100%;flex:0 1 100%;justify-content:flex-end;gap:8px}
+ .meeting-card-controls .primary{margin-left:0}
+}
