@@ -204,10 +204,10 @@ export async function seedWorkspace(workspaceId: string, songs: unknown[], meeti
     if (error) throw error;
   }
   if (meetings.length) {
-    const { error } = await api.from('workspace_meetings').upsert(
-      meetings.map((meeting: any) => ({ workspace_id: workspaceId, id: meeting.id, data: meeting })),
-      { onConflict: 'workspace_id,id' },
-    );
+    const { error } = await api.rpc('seed_workspace_meetings', {
+      target_workspace: workspaceId,
+      meeting_rows: meetings,
+    });
     if (error) throw error;
   }
 }
