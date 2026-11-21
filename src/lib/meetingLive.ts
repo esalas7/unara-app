@@ -81,3 +81,22 @@ export function liveElapsedSeconds(elapsedSeconds: number, startedAt: string | n
   if (!isRunning || !startedAt) return Math.max(0, elapsedSeconds || 0);
   return Math.max(0, (elapsedSeconds || 0) + Math.floor((now - new Date(startedAt).getTime()) / 1000));
 }
+
+/** Remaining seconds derived from the server-backed elapsed timer and section estimate. */
+export function liveSectionRemainingSeconds(estimatedMinutes: number, elapsedSeconds: number) {
+  return Math.max(0, Math.floor(estimatedMinutes || 0)) * 60 - Math.max(0, Math.floor(elapsedSeconds || 0));
+}
+
+/** Format a signed timer value without changing the stored elapsed-time model. */
+export function formatLiveSectionTime(seconds: number, overrun = false) {
+  const value = Math.abs(Math.trunc(seconds));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const remainder = value % 60;
+  const time = hours
+    ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+    : `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+  if (seconds < 0) return `−${time}`;
+  if (overrun && seconds > 0) return `+${time}`;
+  return time;
+}

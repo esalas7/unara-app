@@ -15,7 +15,7 @@ import {
   saveMeetingSections,
   sectionLabel,
 } from './lib/meetingAgenda';
-import { MeetingLiveSong, MeetingSectionTimer, liveElapsedSeconds } from './lib/meetingLive';
+import { MeetingLiveSong, MeetingSectionTimer, formatLiveSectionTime, liveElapsedSeconds, liveSectionRemainingSeconds } from './lib/meetingLive';
 
 type Song = { id: string; title: string; artist: string; key: string; bpm?: number; lyrics?: string; chords?: string; sections?: string; mixedText?: string };
 
@@ -34,6 +34,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   currentSectionId = null,
   liveNow = Date.now(),
   canControlLive = false,
+  liveActionPending = false,
   canAddLiveSongs = false,
   editorMode = false,
   generalPanel,
@@ -60,6 +61,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   currentSectionId?: string | null;
   liveNow?: number;
   canControlLive?: boolean;
+  liveActionPending?: boolean;
   canAddLiveSongs?: boolean;
   editorMode?: boolean;
   generalPanel?: ReactNode;
@@ -269,7 +271,15 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
         const mergedItems = mergeMeetingLiveSongs(section.items, sectionLiveSongs);
         const timer = sectionTimers[section.id];
         const timerElapsed = liveElapsedSeconds(timer?.elapsed_seconds || 0, timer?.started_at || null, !!timer?.is_running, liveNow);
-        const overEstimate = section.estimatedMinutes > 0 && timerElapsed > section.estimatedMinutes * 60;
+        const hasEstimate = section.estimatedMinutes > 0;
+        const remainingSeconds = liveSectionRemainingSeconds(section.estimatedMinutes, timerElapsed);
+        const zeroEstimateOvertime = !hasEstimate && !!timer && timerElapsed > 0;
+        const overEstimate = hasEstimate && timerElapsed > section.estimatedMinutes * 60 || zeroEstimateOvertime;
+        const sectionClock = hasEstimate
+          ? formatLiveSectionTime(remainingSeconds, overEstimate)
+          : timer
+            ? formatLiveSectionTime(timerElapsed, zeroEstimateOvertime)
+            : '—:—';
         const renderItem=(item:typeof mergedItems[number])=>{
           const song=item.type==='song'?songs.find(candidate=>candidate.id===item.songId):undefined;
            if(liveMode&&item.type==='activity')return null;
@@ -329,12 +339,12 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
           </div>
 
           {!editorMode&&<div className={`live-section-clock${currentSectionId===section.id?' current':''}${overEstimate?' over-time':''}`}>
-            <div className="live-section-clock-info"><Clock3 size={16}/><span>{currentSectionId===section.id?'Sección actual':'Tiempo de sección'}</span><b>{formatLiveTime(timerElapsed)}</b><small>Estimado: {section.estimatedMinutes || 0} min{overEstimate?' · Tiempo superado':''}</small></div>
+            <div className="live-section-clock-info"><Clock3 size={16}/><span>{currentSectionId===section.id?(timer?.is_running?'Sección actual · En curso':'Sección actual · Pausada'):timer?'Tiempo registrado':'Pendiente de inicio'}</span><b>{sectionClock}</b><small>{hasEstimate?`Estimado: ${section.estimatedMinutes} min${overEstimate?' · Tiempo superado':''}`:`Sin duración estimada${timer?' · Tiempo transcurrido':''}`}</small></div>
             {canControlLive&&<div className="live-section-clock-actions">
-              {currentSectionId!==section.id&&<button type="button" className="secondary small" onClick={()=>onStartSection?.(section.id)}><Play size={14}/> Iniciar sección</button>}
-              {currentSectionId===section.id&&timer?.is_running&&<button type="button" className="secondary small" onClick={()=>onSectionTimerAction?.(section.id,'section_pause')}><Pause size={14}/> Pausar</button>}
-              {currentSectionId===section.id&&!timer?.is_running&&<button type="button" className="primary small" onClick={()=>onStartSection?.(section.id)}><Play size={14}/> Reanudar</button>}
-              {timerElapsed>0&&<button type="button" className="icon-button" aria-label="Reiniciar cronómetro de sección" onClick={()=>onSectionTimerAction?.(section.id,'section_reset')}><RotateCcw size={14}/></button>}
+              {currentSectionId!==section.id&&<button type="button" className="secondary small" disabled={liveActionPending} onClick={()=>onStartSection?.(section.id)}><Play size={14}/> Iniciar sección</button>}
+              {currentSectionId===section.id&&timer?.is_running&&<button type="button" className="secondary small" disabled={liveActionPending} onClick={()=>onSectionTimerAction?.(section.id,'section_pause')}><Pause size={14}/> Pausar</button>}
+              {currentSectionId===section.id&&!timer?.is_running&&<button type="button" className="primary small" disabled={liveActionPending} onClick={()=>onStartSection?.(section.id)}><Play size={14}/> Reanudar</button>}
+              {timerElapsed>0&&<button type="button" className="icon-button" disabled={liveActionPending} aria-label="Reiniciar cronómetro de sección" onClick={()=>onSectionTimerAction?.(section.id,'section_reset')}><RotateCcw size={14}/></button>}
             </div>}
           </div>}
 
@@ -384,11 +394,4 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
         : <button type="button" className="primary" onClick={onSave} disabled={saving||saveDisabled||!onSave}><Save size={16}/> {saving?'Publicando…':finalActionLabel}</button>}
     </footer>}
   </section>;
-}
-
-function formatLiveTime(seconds: number) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainder = seconds % 60;
-  return hours ? `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(remainder).padStart(2,'0')}` : `${String(minutes).padStart(2,'0')}:${String(remainder).padStart(2,'0')}`;
 }
