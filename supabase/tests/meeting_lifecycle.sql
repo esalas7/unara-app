@@ -1,7 +1,7 @@
 -- Isolated PostgreSQL test harness only. Never run against production.
 BEGIN;
 do $$
-declare owner_id uuid:=gen_random_uuid(); host uuid:=gen_random_uuid(); outsider uuid:=gen_random_uuid();ws uuid:=gen_random_uuid(); other_ws uuid:=gen_random_uuid(); mid text; outcome text;
+declare owner_id uuid:=gen_random_uuid(); host uuid:=gen_random_uuid(); outsider uuid:=gen_random_uuid();ws uuid:=gen_random_uuid(); other_ws uuid:=gen_random_uuid(); mid text; outcome text; previous_event text;
 begin
 insert into auth.users(id) values(owner_id),(host),(outsider);
 perform set_config('test.actor',owner_id::text,true);
@@ -11,7 +11,7 @@ insert into workspace_songs values(ws,'keep','{}');
 for i in 1..11 loop
 mid:='test-'||i;
 perform set_config('test.actor',owner_id::text,true);
-insert into workspace_meetings(workspace_id,id,data) values(ws,mid,jsonb_build_object('id',mid,'status','Preparación','host_user_id',host,'date','2030-02-10','time','12:00','songs','[]'::jsonb,'agenda','{"sections":[{"id":"first","type":"adoracion","items":[]}]}'::jsonb));
+insert into workspace_meetings(workspace_id,id,data) values(ws,mid,jsonb_build_object('id',mid,'status','Preparación','host_user_id',host,'date','2030-02-10','time','12:00','songs','[]'::jsonb,'agenda','{"sections":[{"id":"first","type":"adoracion","items":[]},{"id":"second","type":"adoracion","items":[]},{"id":"third","type":"anuncios","items":[]}]}'::jsonb));
 update workspace_meeting_launch_state set scheduled_at=now()+interval '30 seconds' where workspace_id=ws and meeting_id=mid;
 perform process_due_workspace_meeting_starts();
 perform set_config('test.actor',host::text,true);
@@ -25,6 +25,14 @@ update workspace_meeting_launch_state set scheduled_at=now()-interval '2 seconds
 perform set_config('test.actor','',true);perform process_due_workspace_meeting_starts();perform set_config('test.actor',host::text,true);
 else perform manage_workspace_meeting_launch_action(ws,mid,'start_now');end if;
 assert exists(select 1 from my_meeting_navigation(ws) where meeting_id=mid and screen='first');
+foreach outcome in array array['second','third','second'] loop
+  select event_key into previous_event from my_meeting_navigation(ws) where meeting_id=mid;
+  perform manage_workspace_meeting_host_live_action(ws,mid,'section_start',outcome);
+  assert exists(select 1 from my_meeting_navigation(ws) where meeting_id=mid and screen=outcome and event_key<>previous_event);
+  select event_key into previous_event from my_meeting_navigation(ws) where meeting_id=mid;
+  perform manage_workspace_meeting_host_live_action(ws,mid,'section_start',outcome);
+  assert exists(select 1 from my_meeting_navigation(ws) where meeting_id=mid and screen=outcome and event_key=previous_event);
+end loop;
 perform control_meeting_lifecycle(ws,mid,'pause');
 assert not exists(select 1 from workspace_meeting_section_timers where workspace_id=ws and meeting_id=mid and is_running);
 perform control_meeting_lifecycle(ws,mid,'resume');

@@ -31,7 +31,9 @@ export function useMeetingNavigation(workspace: string, user: string, open: (id:
       .subscribe(status => { if (status === 'SUBSCRIBED') void refresh(); });
     void refresh();
     const timer = window.setInterval(refresh, 5000);
+    const onVisible = () => { if (!document.hidden) void refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', refresh);
-    return () => { disposed = true; clearInterval(timer); window.removeEventListener('online', refresh); void client.removeChannel(channel); };
+    return () => { disposed = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', refresh); void client.removeChannel(channel); };
   }, [workspace,user]);
 }
