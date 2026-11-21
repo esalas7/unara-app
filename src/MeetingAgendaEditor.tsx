@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronRight, Music2, Plus, Save, Trash2, Play, Pause, RotateCcw, Clock3 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronRight, ChevronDown, Info, Music2, Plus, Save, Trash2, Play, Pause, RotateCcw, Clock3 } from 'lucide-react';
 import {
   getMeetingDuration,
   getMeetingSections,
@@ -17,7 +17,7 @@ import {
 } from './lib/meetingAgenda';
 import { MeetingLiveSong, MeetingSectionTimer, liveElapsedSeconds } from './lib/meetingLive';
 
-type Song = { id: string; title: string; artist: string; key: string };
+type Song = { id: string; title: string; artist: string; key: string; bpm?: number; lyrics?: string; chords?: string; sections?: string; mixedText?: string };
 
 export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   meeting,
@@ -78,6 +78,8 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   const [liveSongDrafts, setLiveSongDrafts] = useState<Record<string, string>>({});
   const [liveSongPositions, setLiveSongPositions] = useState<Record<string, string>>({});
   const [addingLiveSong, setAddingLiveSong] = useState<string | null>(null);
+  const [expandedLiveSongs, setExpandedLiveSongs] = useState<Record<string, boolean>>({});
+  const [liveSongFormats, setLiveSongFormats] = useState<Record<string, 'Letra' | 'Mixto' | 'Acordes'>>({});
   const [activeEditorTab, setActiveEditorTab] = useState<string>('general');
   const editorTabsRef = useRef<HTMLElement>(null);
   const editorContentRef = useRef<HTMLDivElement>(null);
@@ -270,6 +272,24 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
         const overEstimate = section.estimatedMinutes > 0 && timerElapsed > section.estimatedMinutes * 60;
         const renderItem=(item:typeof mergedItems[number])=>{
           const song=item.type==='song'?songs.find(candidate=>candidate.id===item.songId):undefined;
+           if(liveMode&&item.type==='activity')return null;
+           if(liveMode&&item.type==='song'){
+             const songIndex=songsOnly.findIndex(entry=>entry.id===item.id);
+             const expanded=expandedLiveSongs[item.id]??songIndex===0;
+             const format=liveSongFormats[item.id]||'Mixto';
+             const mixedContent=song?.mixedText?.trim()||(song?.id==='libre-soy'?'INTRO: Am - F - C - G\n\nESTROFA 1\nAm\nSalvo soy, mi alegría está en tu amor\n                         F\nHoy te exaltaré, día y noche adoraré\n       C                         G\nPorque libre soy en Ti, eres todo mi vivir':song?.chords?`${song.chords}\n\n${song.lyrics||''}`:song?.lyrics||'Esta canción todavía no tiene contenido guardado.');
+             return <article className={`live-song-card${expanded?' expanded':''}${'isLive' in item&&item.isLive?' is-additional':''}`} key={item.id}>
+               <button type="button" className="live-song-heading" aria-expanded={expanded} onClick={()=>setExpandedLiveSongs(current=>({...current,[item.id]:!expanded}))}>
+                 <span className="song-icon"><Music2 size={19}/></span>
+                 <span className="live-song-heading-copy"><b>{song?.title||'Canción no disponible'}{'isLive' in item&&item.isLive&&<em className="live-song-badge">Adicional</em>}</b><small>{song?`${song.artist||'Artista no especificado'} · ${song.key||'—'}`:'Esta referencia no está disponible en el repertorio'}</small></span>
+                 <ChevronDown size={19} className="live-song-chevron"/>
+               </button>
+               {expanded&&song&&<div className="live-song-expanded">
+                 <div className="live-song-formats" role="tablist" aria-label={`Formato de ${song.title}`}>{(['Letra','Mixto','Acordes'] as const).map(tab=><button type="button" role="tab" aria-selected={format===tab} className={format===tab?'selected':''} onClick={()=>setLiveSongFormats(current=>({...current,[item.id]:tab}))} key={tab}>{tab}</button>)}</div>
+                 <div className="live-song-body">{format==='Letra'?<div className="live-song-lyrics">{song.lyrics||'Esta canción todavía no tiene letra guardada.'}</div>:format==='Acordes'?<pre className="mixed-score live-song-score">{song.sections||song.chords||'Aún no hay una guía de acordes guardada.'}</pre>:<pre className="mixed-score live-song-score">{mixedContent}</pre>}</div>
+               </div>}
+             </article>;
+           }
           const agendaIndex=section.items.findIndex(candidate=>candidate.id===item.id);
           const sameTypeItems=section.items.filter(candidate=>candidate.type===item.type);
           const sameTypeIndex=sameTypeItems.findIndex(candidate=>candidate.id===item.id);
@@ -293,7 +313,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
         const songsOnly=mergedItems.filter(item=>item.type==='song');
         const activitiesOnly=mergedItems.filter(item=>item.type==='activity');
         return <article className={`form-card agenda-section${editorMode?' editor-agenda-section section-'+section.type:''}${liveMode?' live-agenda-section section-'+section.type:''}`} id={showSectionNavigation?`meeting-section-${section.id}`:undefined} key={section.id}>
-          {liveMode&&<div className="live-section-title"><span>{sectionIndex+1} · {label}</span></div>}
+          {liveMode&&<div className="live-section-title"><span>{sectionIndex+1} · {label}</span><b>{section.estimatedMinutes||0} min</b></div>}
           {editorMode&&<div className="meeting-editor-section-title"><span>{sectionIndex+1} · {label}</span></div>}
           <div className="agenda-section-header">
             <div><span className="eyebrow">SECCIÓN {sectionIndex+1}</span><h3>{label}</h3></div>
@@ -320,7 +340,10 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
 
           {section.type==='legacy'&&<p className="agenda-legacy-note">Estas canciones provienen de la agenda anterior. Muévelas a una sección para organizarlas.</p>}
 
-          {editorMode?<div className="meeting-editor-columns">
+          {liveMode?<>
+            {activitiesOnly.length>0&&<details className={`live-section-instructions section-${section.type}`}><summary><Info size={18}/><b>Indicaciones de la sección</b><ChevronDown size={18} className="live-instructions-chevron"/></summary><div>{activitiesOnly.map(item=><p key={item.id}>{item.text}</p>)}</div></details>}
+            {songsOnly.length>0?<div className="live-song-list">{mergedItems.filter(item=>item.type==='song').map(renderItem)}</div>:activitiesOnly.length===0?<p className="agenda-empty-items">Esta sección todavía no tiene canciones ni indicaciones.</p>:null}
+          </>:editorMode?<div className="meeting-editor-columns">
             <section className="meeting-editor-column"><h3>Canciones</h3>{songsOnly.length?<div className="agenda-items">{songsOnly.map(renderItem)}</div>:<p className="agenda-empty-items">Aún no hay canciones.</p>}{canEditSection&&<div className="agenda-add-song"><label className="field"><span>Agregar canción</span><select value={songDrafts[section.id]||''} onChange={event=>setSongDrafts(current=>({...current,[section.id]:event.target.value}))}><option value="">Selecciona una canción</option>{songs.map(song=><option key={song.id} value={song.id}>{song.title}{song.artist?` · ${song.artist}`:''}</option>)}</select></label><button type="button" className="primary" disabled={!songDrafts[section.id]} onClick={()=>addSong(section.id)}><Plus size={15}/> Agregar canción</button></div>}</section>
             <section className="meeting-editor-column"><h3>Indicaciones</h3>{activitiesOnly.length?<div className="agenda-items">{activitiesOnly.map(renderItem)}</div>:<p className="agenda-empty-items">Aún no hay indicaciones.</p>}{canEditSection&&<div className="agenda-add-song"><label className="field"><span>Escribir indicación</span><textarea rows={2} value={activityDrafts[section.id]||''} maxLength={1000} placeholder="Escribe una indicación..." onChange={event=>setActivityDrafts(current=>({...current,[section.id]:event.target.value}))}/></label><button type="button" className="primary" disabled={!(activityDrafts[section.id]||'').trim()} onClick={()=>addActivity(section.id)}><Plus size={15}/> Agregar indicación</button></div>}</section>
           </div>:mergedItems.length===0
