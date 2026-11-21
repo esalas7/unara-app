@@ -222,3 +222,78 @@ body:has(.meeting-editor-redesigned){overflow:hidden}
  .meeting-card-controls,.meeting-card-edit-actions{gap:4px}
  .meeting-card-edit-actions .secondary{padding:0 6px;font-size:12px}
 }
+
+/* EN VIVO: a personal view over the existing meeting agenda and live controls. */
+.live-navigation{display:flex;align-items:center;gap:8px;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;padding:8px;margin:-5px 0 16px;background:var(--panel);border:1px solid var(--border);border-radius:12px;touch-action:pan-x pan-y}
+.live-navigation button{flex:0 0 auto;min-height:40px;padding:8px 14px;border:1px solid var(--border);border-radius:9px;background:var(--input);color:var(--text);font:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer}
+.live-navigation button.selected{border-color:var(--teal);background:#20b9b01c;color:var(--teal)}
+.live-navigation button:focus-visible,.live-section-link:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.live-screen{min-width:0}
+.live-general-screen{display:grid;gap:14px}
+.live-general-screen .meeting-overview{margin:0}
+.live-general-timer{display:flex;align-items:center;justify-content:flex-start;gap:14px;flex-wrap:wrap;padding:12px 16px;text-align:left;border-radius:12px}
+.live-general-timer-heading{display:flex;align-items:center;gap:10px}
+.live-general-timer .timer{margin:0;font-size:clamp(26px,3vw,36px);letter-spacing:1px;font-variant-numeric:tabular-nums}
+.live-general-timer .live-readonly-note{flex:1;min-width:170px;margin:0;color:#c2d5d5;font-size:11px}
+.live-general-timer .timer-actions{margin-left:auto}
+.live-general-timer .timer-actions .primary,.live-general-timer .timer-actions .secondary,.live-general-timer>.primary{min-height:40px}
+.live-general-timer .live-loading{flex-basis:100%;text-align:left}
+.live-section-list{margin:0}
+.live-section-list-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.live-section-list-heading h3{margin:4px 0 0}
+.live-section-list ol{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.live-section-link{width:100%;min-width:0;display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--input);color:var(--text);text-align:left;font:inherit;cursor:pointer}
+.live-section-link:hover{border-color:var(--teal);background:#20b9b00d}
+.live-section-link .meeting-editor-section-color{height:36px;flex-basis:7px;width:7px}
+.live-section-link-name{display:grid;gap:3px;min-width:0;flex:1}
+.live-section-link-name b{overflow-wrap:anywhere;font-size:14px}
+.live-section-link-name small{color:var(--muted);font-size:11px}
+.live-section-link-time{min-width:64px;text-align:right;font-size:13px;font-weight:700;white-space:nowrap}
+.live-section-link>svg{flex:0 0 auto;color:var(--muted)}
+.live-section-screen{display:grid;gap:12px}
+.live-section-screen>.live-general-timer{margin:0}
+.live-agenda-section{border-left:4px solid var(--teal)!important}
+.live-agenda-section.section-alabanza{border-left-color:#ffc21c!important}
+.live-agenda-section.section-adoracion{border-left-color:#4caf74!important}
+.live-agenda-section.section-anuncios{border-left-color:#9da7ad!important}
+.live-agenda-section.section-predicacion{border-left-color:#58a9e6!important}
+.live-agenda-section.section-ministracion{border-left-color:#e36a69!important}
+.live-agenda-section.section-legacy{border-left-color:#849399!important}
+.live-section-title{min-height:48px;display:flex;align-items:center;margin:0 0 12px;padding:10px 15px;border-radius:9px;background:#ffc21c;color:#172026;font-size:clamp(18px,2vw,24px);font-weight:800}
+.live-agenda-section.section-adoracion .live-section-title{background:#4caf74;color:#071c12}
+.live-agenda-section.section-anuncios .live-section-title{background:#b9c0c4;color:#182126}
+.live-agenda-section.section-predicacion .live-section-title{background:#58a9e6;color:#071b2b}
+.live-agenda-section.section-ministracion .live-section-title{background:#e36a69;color:#2a0909}
+.live-agenda-section.section-legacy .live-section-title{background:#849399;color:#091317}
+.live-agenda-section>.agenda-section-header{align-items:center}
+.live-agenda-section .agenda-section-actions{align-items:center}
+@media(max-width:650px){
+ .live-navigation{position:sticky;top:0;z-index:4;gap:6px;margin:0 0 12px;padding:7px;border-radius:10px;background:var(--panel);scrollbar-width:none}
+ .live-navigation::-webkit-scrollbar{display:none}
+ .live-navigation button{min-height:42px;padding:8px 12px;font-size:12px}
+ .live-general-screen,.live-section-screen{gap:10px}
+ .live-general-timer{gap:8px 12px;padding:10px 12px}
+ .live-general-timer-heading{gap:7px}
+ .live-general-timer .timer{font-size:27px}
+ .live-general-timer .timer-actions{width:100%;margin:0;justify-content:flex-start}
+ .live-general-timer .timer-actions button{min-height:42px}
+ .live-general-timer .live-readonly-note{flex-basis:100%;min-width:0}
+ .live-general-timer>.primary{min-height:42px}
+ .live-section-list{padding:14px}
+ .live-section-link{gap:9px;padding:10px}
+ .live-section-link-name b{font-size:13px}
+ .live-section-link-name small{font-size:10px}
+ .live-section-link-time{min-width:52px;font-size:12px}
+ .live-section-title{min-height:44px;margin-bottom:9px;padding:8px 12px;font-size:19px}
+ .live-section-screen .agenda-section{padding:14px}
+ .live-section-screen .agenda-section-header{gap:8px}
+ .live-section-screen .agenda-section-header h3{font-size:18px}
+ .live-section-screen .agenda-items{gap:7px;margin:10px 0}
+}
+@media(max-width:380px){
+ .live-navigation{margin-left:-3px;margin-right:-3px}
+ .live-navigation button{padding:8px 10px}
+ .live-section-link{gap:7px;padding:9px}
+ .live-section-link-name b{font-size:12px}
+ .live-section-link-time{min-width:45px;font-size:11px}
+}

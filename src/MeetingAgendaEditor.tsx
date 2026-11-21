@@ -27,6 +27,8 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   onSongOpen,
   onOpenLibrary,
   showSectionNavigation = false,
+  liveMode = false,
+  liveSectionId = null,
   liveSongs = [],
   sectionTimers = {},
   currentSectionId = null,
@@ -51,6 +53,8 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   onSongOpen?: (song: { songId: string; itemId: string; sectionId: string }) => void;
   onOpenLibrary?: () => void;
   showSectionNavigation?: boolean;
+  liveMode?: boolean;
+  liveSectionId?: string | null;
   liveSongs?: MeetingLiveSong[];
   sectionTimers?: Record<string, MeetingSectionTimer>;
   currentSectionId?: string | null;
@@ -174,7 +178,11 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   const minutes = getMeetingDuration(sections);
   const isGeneralStep = editorMode && activeEditorTab === 'general';
   const isTeamStep = editorMode && activeEditorTab === 'team';
-  const visibleSections = editorMode ? sections.filter(section => section.id === activeEditorTab) : sections;
+  const visibleSections = editorMode
+    ? sections.filter(section => section.id === activeEditorTab)
+    : liveMode
+      ? sections.filter(section => section.id === liveSectionId)
+      : sections;
   const editorSteps = editorMode ? ['general', ...sections.map(section => section.id), ...(teamPanel ? ['team'] : [])] : [];
   const editorStepIndex = Math.max(0, editorSteps.indexOf(activeEditorTab));
   const addSectionControl = <div className="agenda-add-section">
@@ -284,7 +292,8 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
         };
         const songsOnly=mergedItems.filter(item=>item.type==='song');
         const activitiesOnly=mergedItems.filter(item=>item.type==='activity');
-        return <article className={`form-card agenda-section${editorMode?' editor-agenda-section section-'+section.type:''}`} id={showSectionNavigation?`meeting-section-${section.id}`:undefined} key={section.id}>
+        return <article className={`form-card agenda-section${editorMode?' editor-agenda-section section-'+section.type:''}${liveMode?' live-agenda-section section-'+section.type:''}`} id={showSectionNavigation?`meeting-section-${section.id}`:undefined} key={section.id}>
+          {liveMode&&<div className="live-section-title"><span>{sectionIndex+1} · {label}</span></div>}
           {editorMode&&<div className="meeting-editor-section-title"><span>{sectionIndex+1} · {label}</span></div>}
           <div className="agenda-section-header">
             <div><span className="eyebrow">SECCIÓN {sectionIndex+1}</span><h3>{label}</h3></div>
