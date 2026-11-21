@@ -153,7 +153,10 @@ export function clearLocalMeetingDraft(workspaceId: string, userId: string, meet
 
 export async function getPublishedMeetings<T>(workspaceId: string) {
   const { data, error } = await client().from('workspace_meetings')
-    .select('id,data,published_version,published_at').eq('workspace_id', workspaceId);
+    .select('id,data,published_version,published_at,workspace_meeting_launch_state(finished_at)').eq('workspace_id', workspaceId);
   if (error) throw error;
-  return (data || []) as { id: string; data: T; published_version: number; published_at: string }[];
+  return (data || []).map(row => {
+    const launch = Array.isArray(row.workspace_meeting_launch_state) ? row.workspace_meeting_launch_state[0] : row.workspace_meeting_launch_state;
+    return launch?.finished_at ? {...row, data:{...row.data, finished_at:launch.finished_at}} : row;
+  }) as { id: string; data: T; published_version: number; published_at: string }[];
 }
