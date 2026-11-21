@@ -231,6 +231,13 @@ body:has(.meeting-editor-redesigned){overflow:hidden}
 .live-screen{min-width:0}
 .live-general-screen{display:grid;gap:14px}
 .live-general-screen .meeting-overview{margin:0}
+.meeting-launch-card{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;padding:13px 16px;border:1px solid var(--border);border-radius:12px}
+.meeting-launch-copy{display:grid;gap:5px;min-width:0}.meeting-launch-copy>b{font-size:14px}.meeting-launch-copy>span:not(.eyebrow){color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.meeting-launch-card>small{color:var(--muted);font-size:11px}.meeting-launch-card.countdown-active{border-color:var(--teal);box-shadow:0 0 0 1px #20b9b04a}
+.meeting-start-countdown{display:flex;align-items:baseline;gap:8px;color:var(--teal);font-size:clamp(21px,3vw,29px);font-variant-numeric:tabular-nums}.meeting-start-countdown small{font-size:11px;font-weight:600}
+.meeting-launch-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.meeting-launch-actions .danger-button{border-color:#d26169;color:#e7888e}
+.meeting-host-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:12px 0 18px}.meeting-host-fields .field small{color:var(--muted);font-size:11px}
+.meeting-postpone-modal{width:min(540px,100%)}.meeting-postpone-modal>p{color:var(--muted);line-height:1.5}.meeting-postpone-modal>.meeting-launch-actions{justify-content:flex-end;margin-top:18px}
 .live-general-timer{display:flex;align-items:center;justify-content:flex-start;gap:14px;flex-wrap:wrap;padding:12px 16px;text-align:left;border-radius:12px}
 .live-general-timer-heading{display:flex;align-items:center;gap:10px}
 .live-general-timer .timer{margin:0;font-size:clamp(26px,3vw,36px);letter-spacing:1px;font-variant-numeric:tabular-nums}
@@ -272,6 +279,9 @@ body:has(.meeting-editor-redesigned){overflow:hidden}
  .live-navigation::-webkit-scrollbar{display:none}
  .live-navigation button{min-height:42px;padding:8px 12px;font-size:12px}
  .live-general-screen,.live-section-screen{gap:10px}
+ .meeting-launch-card{align-items:flex-start;flex-direction:column;padding:12px}
+ .meeting-launch-actions{width:100%}.meeting-launch-actions button{flex:1;min-height:42px}
+ .meeting-host-fields{grid-template-columns:1fr;gap:10px}
  .live-general-timer{gap:8px 12px;padding:10px 12px}
  .live-general-timer-heading{gap:7px}
  .live-general-timer .timer{font-size:27px}

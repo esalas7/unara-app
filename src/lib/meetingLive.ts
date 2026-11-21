@@ -36,6 +36,21 @@ export type MeetingLiveSong = {
 export type MeetingLiveAction = 'general_start' | 'general_pause' | 'general_reset' |
   'section_start' | 'section_pause' | 'section_reset' | 'add_song';
 
+export type MeetingLaunchState = {
+  workspace_id: string;
+  meeting_id: string;
+  host_user_id: string | null;
+  scheduled_at: string | null;
+  time_zone: string;
+  status: 'disabled' | 'scheduled' | 'cancelled' | 'started' | 'completed';
+  started_event_id: string | null;
+  started_at: string | null;
+  server_now: string;
+  rescheduled_from: string | null;
+};
+
+export type MeetingLaunchAction = 'start_now' | 'cancel' | 'postpone';
+
 function api() {
   if (!supabase) throw new Error('La conexión con UNARA no está disponible.');
   return supabase;
@@ -56,6 +71,49 @@ export async function getMeetingLiveData(workspaceId: string, meetingId: string)
     timers: (timerResult.data || []) as MeetingSectionTimer[],
     songs: (songResult.data || []) as MeetingLiveSong[],
   };
+}
+
+export async function getMeetingLaunchState(workspaceId: string, meetingId: string) {
+  const { data, error } = await api().rpc('get_workspace_meeting_launch_state', {
+    target_workspace: workspaceId,
+    target_meeting: meetingId,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return (row || null) as MeetingLaunchState | null;
+}
+
+export async function runMeetingLaunchAction(input: {
+  workspaceId: string;
+  meetingId: string;
+  action: MeetingLaunchAction;
+  postponeDate?: string;
+  postponeTime?: string;
+}) {
+  const { data, error } = await api().rpc('manage_workspace_meeting_launch_action', {
+    target_workspace: input.workspaceId,
+    target_meeting: input.meetingId,
+    launch_action: input.action,
+    new_local_date: input.postponeDate || null,
+    new_local_time: input.postponeTime || null,
+  });
+  if (error) throw error;
+  return data as string | null;
+}
+
+export async function runMeetingHostLiveAction(input: {
+  workspaceId: string;
+  meetingId: string;
+  action: Exclude<MeetingLiveAction, 'add_song'>;
+  sectionId?: string;
+}) {
+  const { error } = await api().rpc('manage_workspace_meeting_host_live_action', {
+    target_workspace: input.workspaceId,
+    target_meeting: input.meetingId,
+    live_action: input.action,
+    target_section: input.sectionId || null,
+  });
+  if (error) throw error;
 }
 
 export async function runMeetingLiveAction(input: {
