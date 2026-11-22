@@ -19,6 +19,22 @@ import { MeetingLiveSong, MeetingSectionTimer, formatLiveSectionTime, liveElapse
 
 type Song = { id: string; title: string; artist: string; key: string; bpm?: number; lyrics?: string; chords?: string; sections?: string; mixedText?: string };
 
+function EstimatedMinutesInput({ minutes, onChange }: { minutes: number; onChange: (value: number) => void }) {
+  const [editingText, setEditingText] = useState<string | null>(null);
+  return <label className="field agenda-minutes"><span>Minutos estimados</span>
+    <input type="text" inputMode="numeric" pattern="[0-9]*" value={editingText ?? String(minutes)}
+      onFocus={event => { setEditingText(event.currentTarget.value); event.currentTarget.select(); }}
+      onChange={event => {
+        const text = event.currentTarget.value;
+        if (!/^\d*$/.test(text) || !Number.isSafeInteger(Number(text))) return;
+        setEditingText(text);
+        if (text !== '' && Number(text) !== minutes) onChange(Number(text));
+      }}
+      onBlur={() => setEditingText(null)}
+    />
+  </label>;
+}
+
 export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
   meeting,
   songs,
@@ -328,7 +344,7 @@ export default function MeetingAgendaEditor<T extends MeetingWithAgenda>({
           <div className="agenda-section-header">
             <div><span className="eyebrow">SECCIÓN {sectionIndex+1}</span><h3>{label}</h3></div>
             <div className="agenda-section-actions">
-              {canEditSection&&<label className="field agenda-minutes"><span>Minutos estimados</span><input type="number" min="0" step="1" value={section.estimatedMinutes} onChange={event=>{const parsed=Number(event.target.value);const value=Number.isFinite(parsed)?Math.max(0,Math.floor(parsed)):0;updateSections(current=>current.map(item=>item.id===section.id?{...item,estimatedMinutes:value}:item));}}/></label>}
+              {canEditSection&&<EstimatedMinutesInput minutes={section.estimatedMinutes} onChange={value=>updateSections(current=>current.map(item=>item.id===section.id?{...item,estimatedMinutes:value}:item))}/>}
               {!canEditSection&&<span className="pill">{section.estimatedMinutes} min</span>}
               {canEditSection&&!editorMode&&<>
                 <button type="button" className="icon-button" aria-label="Subir sección" disabled={sectionIndex===0} onClick={()=>updateSections(current=>reorderMeetingSection(current,section.id,-1))}><ArrowUp size={16}/></button>
